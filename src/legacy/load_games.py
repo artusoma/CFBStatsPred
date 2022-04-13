@@ -13,6 +13,14 @@ class Team:
     offeff: float
     defeff: float
     win_p: float = .5
+    record_history: Dict[int, List[int, int]] = {}
+    offeff_history: Dict[int, Dict[int, float]] = {} #Year => week => offeff
+    defeff_history: Dict[int, Dict[int, float]] = {} #Year => week => defeff
+
+    def get_record(self, year: int):
+        wins = self.record_history[year][0]
+        losses = self.record_history[year][1]
+        return wins/(wins + losses)
 
 @dataclass
 class Game:
@@ -27,6 +35,14 @@ class Season:
     """
     Some things to do:
         1. Probably move pulling games to some sort of iterable function instead of reusing same code
+        2. Move season to its own class. Then, have different models inherit this class. 
+        3. Keep history, winning percentage, etc. in Team. Maybe move this to a class. Eventually, maybe Game should
+        also be a class once we being storing drive data. 
+
+        Some models
+            1. Drive by drive
+            2. Bayesian
+            3. Machine learning
     """
 
     def __init__(self, offinit: float = 28., definit: float = 28.):
