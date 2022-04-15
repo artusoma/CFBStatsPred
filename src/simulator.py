@@ -11,9 +11,8 @@ class Team:
     defeff: float
     win_p: float = .5
     record_history: Dict[int, List[int]] = field(default_factory=dict) #Year => [wins, losses]
-    
-    #Year => week => winp, off, def
-    stat_history: Dict[int, Dict[int, Tuple[float, float, float]]] = field(default_factory=dict) 
+    stat_history: Dict[int, Dict[int, Tuple[float, float, float]]] = field(default_factory=dict)  #Year => week => winp, off, def
+    conf: str = None # "P5", "G5", "Other" going to be used to set effs & K, maybe others
 
     def get_record(self, year: int) -> float:
         wins = self.record_history[year][0]
@@ -103,9 +102,6 @@ class Simulator(object):
 
         self.schedules[year] = season_games
         return
-
-
-
 
 #########################################
 ##Testing

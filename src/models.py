@@ -8,6 +8,12 @@ from typing import Callable
 
 class KenPom(Simulator):
     def __init__(self, offinit: float = 28., definit: float = 28., update_mapping: Callable = None) -> None:
+        """
+        Args:
+            offinit (int):
+            definit (int):
+            update_mapping (Callable):
+        """
         super().__init__(offinit, definit)
         if update_mapping == None:
             update_mapping = self._empty_callable
@@ -23,7 +29,7 @@ class KenPom(Simulator):
             self.update_eff(game=game, K=K)
         return
 
-    def update_eff(self, game: Game, K: float = .2):
+    def update_eff(self, game: Game, year: int, K: float = .2):
         """From a single game update the teams offeff and defeff. 
         """
         
@@ -70,7 +76,7 @@ class KenPom(Simulator):
                 ncorrect += 1
             total += 1
 
-            self.update_eff(game=game, K=K)
+            self.update_eff(game=game, year=year, K=K)
 
         return ncorrect/total
 
@@ -123,12 +129,12 @@ def exp_squared(value: float) -> float:
 
 ##Testing
 if __name__ == "__main__":
-    simulator = KenPom(update_mapping=exp_squared)
+    simulator = KenPom(update_mapping=None)
     simulator.init_teams(["../data/2019season.csv"])
     for year in range(2010, 2020):
         simulator.load_season_schedule(year, f"../data/{year}season.csv")
 
     for year in range(2010, 2020):
-        correct_percentage = simulator.evaluate_predicting_power(year=year, power=6, K=.1)
-        simulator.init_next_year(year, factor=.8)
+        correct_percentage = simulator.evaluate_predicting_power(year=year, power=3, K=.1)
+        simulator.init_next_year(year, factor=.5)
         print(correct_percentage)
