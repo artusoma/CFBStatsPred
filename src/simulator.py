@@ -11,6 +11,7 @@ class Team:
     defeff: float
     win_p: float = .5
     record_history: Dict[int, List[int]] = field(default_factory=dict) #Year => [wins, losses]
+    
     #Year => week => winp, off, def
     stat_history: Dict[int, Dict[int, Tuple[float, float, float]]] = field(default_factory=dict) 
 

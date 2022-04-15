@@ -1,41 +1,58 @@
-from simulator import Simulator
+from simulator import Simulator, Team, Game
 from stats_utils import StatsUtils
 import numpy as np
 from plotting_utils import plot_team_data
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from typing import Callable
 
 class KenPom(Simulator):
-    def __init__(self, offinit: float = 28., definit: float = 28.) -> None:
+    def __init__(self, offinit: float = 28., definit: float = 28., update_mapping: Callable = None) -> None:
         super().__init__(offinit, definit)
+        if update_mapping == None:
+            update_mapping = self._empty_callable
+        self.mapping = update_mapping
         return 
 
-    def train_elo(self, year: int, K: float = .2) -> None:
+    def train_eff(self, year: int, K: float = .2) -> None:
+        """Updates effective offense and defense without recording model
+        performance. 
+        """
         ##Iterate through each week in schedule
         for game in self.iterate_season(year=year):
-            home = self.teams[game.home] ##Grab team objects from team names
-            away = self.teams[game.away]
-
-            ##Adjust home offeff
-            expected_home_offense = (home.offeff + away.defeff)/2
-            home.offeff = home.offeff + K*(game.home_score-expected_home_offense)
-
-            ##Adjust away offeff
-            expected_away_offense = (away.offeff + home.defeff)/2
-            away.offeff = away.offeff + K*(game.away_score-expected_away_offense)
-            home.defeff = home.defeff + K*(game.away_score-expected_away_offense) ##Adjust home defeff
-            away.defeff = away.defeff + K*(game.home_score-expected_home_offense) ##Adjust away defeff
-
-            ##Now, update winning percentages
-            home.win_p = StatsUtils.pythag_win_percentage(home)
-            away.win_p = StatsUtils.pythag_win_percentage(away)
-
-            ##Add to histories
-            home.add_history(year=year, week=game.week)
-            away.add_history(year=year, week=game.week)
+            self.update_eff(game=game, K=K)
         return
 
-    def evaluate_predicting_power(self, year: int, power: float = 2) -> float:
+    def update_eff(self, game: Game, K: float = .2):
+        """From a single game update the teams offeff and defeff. 
+        """
+        
+        home = self.teams[game.home] ##Grab team objects from team names
+        away = self.teams[game.away]
+
+        ##Adjust home offeff
+        expected_home_offense = (home.offeff + away.defeff)/2
+        home.offeff = home.offeff + K*(self.mapping(game.home_score-expected_home_offense))
+
+        ##Adjust away offeff
+        expected_away_offense = (away.offeff + home.defeff)/2
+        away.offeff = away.offeff + K*(self.mapping(game.away_score-expected_away_offense))
+        home.defeff = home.defeff + K*(self.mapping(game.away_score-expected_away_offense)) ##Adjust home defeff
+        away.defeff = away.defeff + K*(self.mapping(game.home_score-expected_home_offense)) ##Adjust away defeff
+
+        ##Now, update winning percentages
+        home.win_p = StatsUtils.pythag_win_percentage(home)
+        away.win_p = StatsUtils.pythag_win_percentage(away)
+
+        ##Add to histories
+        home.add_history(year=year, week=game.week)
+        away.add_history(year=year, week=game.week)
+        return 
+
+    def evaluate_predicting_power(self, year: int, power: float = 2., K: float = 2.) -> float:
+        """Iterate a season and keep track of how the model predicts vs the actual outcome of 
+        the game. 
+        """
         ncorrect = 0
         total = 0
         for team_name in self.teams:
@@ -52,6 +69,8 @@ class KenPom(Simulator):
             if (game.home_score < game.away_score) & (StatsUtils.log5_win_prob(team1, team2) < .5):
                 ncorrect += 1
             total += 1
+
+            self.update_eff(game=game, K=K)
 
         return ncorrect/total
 
@@ -77,19 +96,39 @@ class KenPom(Simulator):
             team_obj = self.teams[team_name]
             observed_values.append(team_obj.get_record(year=year))
             pythag_values.append(team_obj.win_p)
-        return np.mean( (np.array(pythag_values) - np.array(observed_values))**2 )
+        return np.mean((np.array(pythag_values) - np.array(observed_values))**2)
+
+    def init_next_year(self, prev_year: int, factor: float = .5):
+        for team in self.teams:
+            try:
+                last_year_stats = self.teams[team].stat_history[prev_year]
+            except KeyError:
+                continue
+            final_week = max(week for week, stats in last_year_stats.items())
+            prev_off, prev_def = last_year_stats[final_week][1:3]
+            new_off = prev_off*factor + self.offinit*(1-factor)
+            new_def = prev_def*factor + self.definit*(1-factor)
+            self.teams[team].offeff = new_off
+            self.teams[team].defeff = new_def
+        return
+
+    def _empty_callable(self, value: float) -> float:
+        return value
+
+def exp_squared(value: float) -> float:
+    if value >= 0:
+        return -21*np.exp(-0.005*value**2) + 21
+    if value < 0:
+        return 21*np.exp(-0.005*value**2) - 21
 
 ##Testing
 if __name__ == "__main__":
-    simulator = KenPom()
+    simulator = KenPom(update_mapping=exp_squared)
     simulator.init_teams(["../data/2019season.csv"])
     for year in range(2010, 2020):
         simulator.load_season_schedule(year, f"../data/{year}season.csv")
 
-    for year in range(2010, 2019):
-        simulator.train_elo(year=year, K=.01)
-        correct_percentage = simulator.evaluate_predicting_power(year=(year+1), power=2)
+    for year in range(2010, 2020):
+        correct_percentage = simulator.evaluate_predicting_power(year=year, power=6, K=.1)
+        simulator.init_next_year(year, factor=.8)
         print(correct_percentage)
-
-    mse = simulator.evaluate_pythag_power(year=2018, power=2)
-    print(mse)
