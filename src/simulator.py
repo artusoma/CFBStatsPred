@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple
+import copy
 
 ##Define a season and game class
 @dataclass
@@ -46,14 +47,14 @@ class Simulator(object):
     def __init__(self, offinit: float = 28., definit: float = 28.) -> None:
         self.schedules = {} ##Schedules for each year. Maps year => list of games
         self.teams = {}     ##Maps team name => Team obj,
+        self.team_orig = {}
 
         self.offinit = offinit
         self.definit = definit
-
         return 
 
     def iterate_season(self, year: int) -> Game:
-         for week in self.schedules[year]:
+        for week in self.schedules[year]:
             games_in_week = self.schedules[year][week] ##Grab that weeks games
             for game in games_in_week: ##Iterate through weekly games to update
                 yield game
@@ -74,6 +75,7 @@ class Simulator(object):
 
         #Initialize teams with teams with the default starting offeff and defeff
         self.teams = {team:Team(team, self.offinit, self.definit) for team in unique_teams}
+        self.team_orig = copy.deepcopy(self.teams)
         return 
 
     def load_season_schedule(self, year: int, fpath: str) -> None:
@@ -103,6 +105,11 @@ class Simulator(object):
         self.schedules[year] = season_games
         return
 
+    def reset_sim(self) -> None:
+        self.teams = self.team_orig
+        return 
+
+
 #########################################
 ##Testing
 if __name__ == "__main__":
@@ -110,5 +117,5 @@ if __name__ == "__main__":
     simulator.init_teams(["../data/2019season.csv"])
     for year in range(2010, 2020):
             simulator.load_season_schedule(year, f"../data/{year}season.csv")
-    for game in simulator.iterate_season(2010):
+    for game in simulator.iterate_season(2018):
         print(game)

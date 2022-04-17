@@ -4,7 +4,10 @@ import numpy as np
 from plotting_utils import plot_team_data
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from typing import Callable
+from typing import Callable, Tuple, List, Dict
+
+##PACE!
+##See which teams perform well and poorly
 
 class KenPom(Simulator):
     def __init__(self, offinit: float = 28., definit: float = 28., update_mapping: Callable = None) -> None:
@@ -13,6 +16,8 @@ class KenPom(Simulator):
             offinit (int):
             definit (int):
             update_mapping (Callable):
+
+        Returns: None
         """
         super().__init__(offinit, definit)
         if update_mapping == None:
@@ -21,8 +26,12 @@ class KenPom(Simulator):
         return 
 
     def train_eff(self, year: int, K: float = .2) -> None:
-        """Updates effective offense and defense without recording model
+        """Updates offense and defense efficiency without recording model
         performance. 
+
+        Args:
+            year (int):
+            K (float):
         """
         ##Iterate through each week in schedule
         for game in self.iterate_season(year=year):
@@ -31,8 +40,12 @@ class KenPom(Simulator):
 
     def update_eff(self, game: Game, year: int, K: float = .2):
         """From a single game update the teams offeff and defeff. 
+
+        Args:
+            game (Game): 
+            year (int):
+            K (float):
         """
-        
         home = self.teams[game.home] ##Grab team objects from team names
         away = self.teams[game.away]
 
@@ -58,6 +71,14 @@ class KenPom(Simulator):
     def evaluate_predicting_power(self, year: int, power: float = 2., K: float = 2.) -> float:
         """Iterate a season and keep track of how the model predicts vs the actual outcome of 
         the game. 
+
+        Args:
+            year (int):
+            power (float):
+            K (float):
+
+        Returns: 
+            float
         """
         ncorrect = 0
         total = 0
@@ -80,7 +101,16 @@ class KenPom(Simulator):
 
         return ncorrect/total
 
-    def evaluate_pythag_power(self, year: int, power: float = 2) -> float:
+    def evaluate_pythag_power(self, year: int, power: float = 2) -> Tuple[float, float]:
+        """
+        Args:
+            year (int):
+            power (float):
+
+        Returns: 
+            float: Predicted win percentages from pythagorean
+            float: Actual win percentages
+        """
         ##Compute updated winning percentage with given power
         for team_name in self.teams:
             team_obj = self.teams[team_name]
@@ -99,10 +129,13 @@ class KenPom(Simulator):
         pythag_values = []
         observed_values = []
         for team_name in self.teams:
-            team_obj = self.teams[team_name]
-            observed_values.append(team_obj.get_record(year=year))
-            pythag_values.append(team_obj.win_p)
-        return np.mean((np.array(pythag_values) - np.array(observed_values))**2)
+            try:
+                team_obj = self.teams[team_name]
+                observed_values.append(team_obj.get_record(year=year))
+                pythag_values.append(team_obj.win_p)
+            except KeyError:
+                continue
+        return np.array(pythag_values), np.array(observed_values)
 
     def init_next_year(self, prev_year: int, factor: float = .5):
         for team in self.teams:
@@ -123,18 +156,25 @@ class KenPom(Simulator):
 
 def exp_squared(value: float) -> float:
     if value >= 0:
-        return -21*np.exp(-0.005*value**2) + 21
+        return -31*np.exp(-0.012*value**1.5) + 31
     if value < 0:
-        return 21*np.exp(-0.005*value**2) - 21
+        return 31*np.exp(-0.012*(-value)**1.5) - 31
 
 ##Testing
 if __name__ == "__main__":
-    simulator = KenPom(update_mapping=None)
+    simulator = KenPom(offinit=27, definit=27, update_mapping=None)
     simulator.init_teams(["../data/2019season.csv"])
-    for year in range(2010, 2020):
+    for year in range(2000, 2020):
         simulator.load_season_schedule(year, f"../data/{year}season.csv")
 
-    for year in range(2010, 2020):
-        correct_percentage = simulator.evaluate_predicting_power(year=year, power=3, K=.1)
-        simulator.init_next_year(year, factor=.5)
-        print(correct_percentage)
+    all_p = []
+    for year in range(2000, 2020):
+        correct_percentage = simulator.evaluate_predicting_power(year=year, power=6, K= 0.13572088082974532)
+        pythag, observed = simulator.evaluate_pythag_power(year=year, power=6)
+        all_p.append(correct_percentage)
+
+        simulator.init_next_year(prev_year=year, factor=.5)
+
+    print(np.mean(all_p))
+
+    
